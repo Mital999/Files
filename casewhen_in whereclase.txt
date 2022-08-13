@@ -1,0 +1,194 @@
+USE [IPCLGatePass]
+GO
+/****** Object:  StoredProcedure [dbo].[GetRptReturnableGoodsRegister]    Script Date: 09-07-2022 11:58:13 ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+--exec GetRptReturnableGoodsRegister 'All','04-01-2022','03-31-2023','','0','','' ,''    
+ALTER PROCEDURE [dbo].[GetRptReturnableGoodsRegister]
+(@All as varchar(10),
+ @StartDate AS VARCHAR(50),
+ @EndDate AS VARCHAR(50),
+ @Section AS VARCHAR(50),
+ @NoofDays AS VARCHAR(10),
+ @VendorCode AS VARCHAR(50),
+ @EmpCode AS VARCHAR(50),
+ @purpose AS varchar(max)
+  )
+AS
+BEGIN
+	declare	@query As Varchar(Max);
+
+	create table #tmlRGP(
+			RowSrno  varchar(max) ,
+			SectionCode  varchar(max),
+			GatePassNumber varchar(max),
+			Date  varchar(max),
+			ReturnDate  varchar(max),
+			VendorCode  varchar(max),
+			Vendorname  varchar(max),
+			Purpose  varchar(max),
+			ItemCode  varchar(max),
+			Description  varchar(max),
+			Uom varchar(max),
+			Challan varchar(max),
+			Received int,
+			Accepted int,
+			Rejected int,
+			Remarks varchar(max),
+			PrepBY varchar(max),
+			Approvedby varchar(max)
+	)
+	
+	if @All='All'
+	begin
+	insert into #tmlRGP(
+			RowSrno ,
+			SectionCode ,
+			GatePassNumber ,
+			Date  ,
+			ReturnDate  ,
+			VendorCode ,
+			Vendorname ,
+			Purpose ,
+			ItemCode  ,
+			Description  ,
+			Uom ,
+			Challan ,
+			Received ,
+			Accepted ,
+			Rejected ,
+			Remarks,
+			PrepBY,
+			Approvedby 
+	)select
+			s.RowSrno,
+			p.SectionCode,
+			p.GatePassNumber ,
+			Convert(date,r.Date,103),
+			Convert(date,r.ReturnDate,103),
+			r.VendorCode,
+			r.Vendorname,
+			r.Purpose,
+			s.ItemCode,
+			s.Description,
+			case when r.Purpose ='Gauge/Fixture/Pin/Bushes' then 'Nos' else s.UOM end  ,
+			Convert(varchar(10),'') as Challan,
+			Convert(varchar(10),'') as Received,
+			Convert(varchar(10),'') as Accepted,
+			Convert(varchar(10),'') as Rejected,
+			r.Remarks ,
+			p.UserId ,
+		   (select LEFT (EmpFirstName, 1)+'. '+ LEFT (EmpMiddleName, 1) +'. '+ EmpSurName as EmpFirstName  From [IPCLWebHR].[dbo].[EmployeeMaster] Where EmpRollNo=r.AuthorizedBy )
+		   
+		from RGP as  p,GetPassdtViewForRGP  as s , GetPassHDViewForRGP as r
+		where p.GatePassNumber=s.GatePassNumber and p.GatePassNumber=r.GatePassNumber
+		and r.Date between @StartDate and @EndDate
+		and r.SectionCode like '%'+@Section+'%' 
+		and r.VendorCode like '%'+@VendorCode+'%' 
+		and r.AuthorizedBy like '%'+@EmpCode+'%'
+		and r.Purpose like '%'+@purpose+'%'
+	end
+    if @All='Pending'
+	begin
+	insert into #tmlRGP(
+			RowSrno ,
+			SectionCode ,
+			GatePassNumber ,
+			Date  ,
+			ReturnDate  ,
+			VendorCode ,
+			Vendorname ,
+			Purpose ,
+			ItemCode  ,
+			Description  ,
+			Uom ,
+			Challan ,
+			Received ,
+			Accepted ,
+			Rejected ,
+			Remarks,
+			PrepBY,
+			Approvedby 
+	)select
+			s.RowSrno,
+			p.SectionCode,
+			p.GatePassNumber ,
+			Convert(date,r.Date,103),
+			Convert(date,r.ReturnDate,103),
+			r.VendorCode,
+			r.Vendorname,
+			r.Purpose,
+			s.ItemCode,
+			s.Description,
+			case when r.Purpose ='Gauge/Fixture/Pin/Bushes' then 'Nos' else s.UOM end  ,
+			Convert(varchar(10),'') as Challan,
+			Convert(varchar(10),'') as Received,
+			Convert(varchar(10),'') as Accepted,
+			Convert(varchar(10),'') as Rejected,
+			r.Remarks ,
+			p.ConfirmedUserID ,
+		   (select LEFT (EmpFirstName, 1)+'. '+ LEFT (EmpMiddleName, 1) +'. '+ EmpSurName as EmpFirstName  From [IPCLWebHR].[dbo].[EmployeeMaster] Where EmpRollNo=r.AuthorizedBy )
+		   
+		from RGP as  p,GetPassdtViewForRGP  as s , GetPassHDViewForRGP as r
+		where p.GatePassNumber=s.GatePassNumber and p.GatePassNumber=r.GatePassNumber
+		and r.Date between @StartDate and @EndDate
+		and r.SectionCode like '%'+@Section+'%' 
+		and r.VendorCode like '%'+@VendorCode+'%' 
+		and r.AuthorizedBy like '%'+@EmpCode+'%'
+		and r.Purpose like '%'+@purpose+'%'
+		and Convert(date,ReturnDate,103) > Convert(date,getdate(),103)
+	end
+
+	select
+		g.RowSrNo as Rowno,
+		r.GatePassNumber,
+		g.ChallanQty as Challan,
+		g.Description,
+		g.Received as Received,
+		g.Received as Accepted,
+		g.Rejected as Rejected 
+		into #tmpRRGP
+	from RRGP as r ,GatePassDtViewForRRGP as g  where r.GatePassNumber=g.GatePassNumber
+
+	update #tmlRGP  
+			set #tmlRGP.Challan =r.Challan, 
+				#tmlRGP.Received=r.Received,
+				#tmlRGP.Accepted=r.Accepted,
+				#tmlRGP.Rejected=r.Rejected
+			from #tmpRRGP as r
+			where  #tmlRGP.GatePassNumber= r.GatePassNumber and  #tmlRGP.RowSrno=r.Rowno
+
+
+    --update #tmlRGP set SectionCode='', GatePassNumber='' , date='',ReturnDate='',VendorCode='',Vendorname='',Purpose='' where RowSrno !=1
+
+	Set @query = 'select 
+		ROW_NUMBER() OVER(ORDER BY (SELECT 1)) as Srno,
+		case when  RowSrno!=1 then '''' else SectionCode end as SectionCode ,
+		case when  RowSrno!=1 then '''' else GatePassNumber end as GatePassNumber ,
+		case when  RowSrno!=1 then '''' else cast(Date as varchar(50)) end as Date ,
+		case when  RowSrno!=1 then '''' else cast(ReturnDate as varchar(50)) end as ReturnDate,
+		case when  RowSrno!=1 then '''' else VendorCode end as VendorCode,
+		case when  RowSrno!=1 then '''' else Vendorname end as Vendorname ,
+		case when  RowSrno!=1 then '''' else Purpose end as Purpose,
+		ItemCode,
+		Description,
+		UOM,
+		Challan,
+		Received,
+		Accepted,
+		Rejected,
+		Remarks,
+		PrepBY,
+		ApprovedBy from #tmlRGP  '
+
+If(@NoofDays <> 0)
+	--Set @query = @query + ' where DATEDIFF(day,getdate(),ReturnDate) = ' + Cast(@NoofDays as Varchar(50))
+
+	Set @query = @query + ' where abs(DATEDIFF(day,getdate(),ReturnDate)) = ' + Cast(@NoofDays as Varchar(50))
+
+EXECUTE (@query)	
+
+END

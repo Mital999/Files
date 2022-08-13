@@ -1,0 +1,32 @@
+USE [db_crud]
+GO
+/****** Object:  StoredProcedure [dbo].[FromAndToDate]    Script Date: 12-08-2022 11:17:41 ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+/*
+	exec FromAndToDate '2022-01-25',''
+	select * from TestDate
+*/
+ALTER proc [dbo].[FromAndToDate]
+@From date,
+@To date 
+as
+begin
+		if @From != '' and @To = ''
+		begin
+			select * from TestDate where (@From <= toDate or @From >= fromDate) and @From <= toDate
+		end
+
+		else if @From = '' and @To != ''
+		begin
+			select * from TestDate where @To >= toDate or @To >= fromDate and @To <= toDate
+		end
+
+		else if @From != '' and @To != ''
+		begin
+			select * from TestDate where (@From <= toDate and (@From >= fromDate or @From <= fromDate)) 
+			and ((toDate <= @To or @To <= toDate) and @To >= fromDate)
+		end
+end

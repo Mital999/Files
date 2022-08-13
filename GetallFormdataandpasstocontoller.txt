@@ -1,0 +1,342 @@
+@model DynamicForm_Jason_demo.Models.DCN_Tran
+
+@{
+    ViewBag.Title = "CreateTemplate";
+}
+@{
+    //stage
+    Dictionary<int, string> Stage = new Dictionary<int, string>();
+    for (int i = 1; i <= 25; i++)
+    {
+        if (i.ToString().Length == 1)
+        {
+            Stage.Add(i, "0" + i);
+        }
+        else
+        {
+            Stage.Add(i, i.ToString());
+        }
+    }
+    ViewBag.stage = Stage;
+
+    //Mandatory Condition
+    Dictionary<string, string> Mandatory = new Dictionary<string, string>();
+    Mandatory.Add("Y", "Yes");
+    Mandatory.Add("N", "No");
+    Mandatory.Add("C", "Conditional");
+    ViewBag.Mandatory = Mandatory;
+
+    Dictionary<string, string> StatusList = new Dictionary<string, string>();
+    StatusList.Add("Submit", "Submit");
+    StatusList.Add("Reject", "Reject");
+    StatusList.Add("SendBack", "SendBack");
+    StatusList.Add("Hold", "Hold");
+    ViewBag.StatusList = StatusList;
+
+    Dictionary<string, string> AlwyasMove = new Dictionary<string, string>();
+    AlwyasMove.Add("Y", "Yes");
+    AlwyasMove.Add("N", "No");
+    ViewBag.AlwyasMove = AlwyasMove;
+
+    Dictionary<string, string> FileUploadReq = new Dictionary<string, string>();
+    FileUploadReq.Add("Y", "Yes");
+    FileUploadReq.Add("N", "No");
+    FileUploadReq.Add("O", "Optional");
+    ViewBag.FileUploadReq = FileUploadReq;
+
+    Dictionary<int, string> Escalation = new Dictionary<int, string>();
+    Escalation.Add(0, "0");
+    Escalation.Add(1, "1");
+    ViewBag.Escalation = Escalation;
+}
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width" />
+    <title>CreateTemplate</title>
+    <style>
+        Label {
+            text-align: right;
+        }
+
+        .row {
+            padding-bottom: 1.5%;
+        }
+
+        .panel-heading {
+            padding-top: 1px !important;
+            padding-bottom: 0px !important;
+        }
+        textarea{
+            max-width:600px !important;
+        }
+    </style>
+    <script type="text/javascript">
+        $(document).ready(function () {
+            $("#ADD").click(function () {
+                var data = {};
+               
+                var dataArray = $("form").serializeArray();
+
+                $.each(dataArray, function (i, field) {
+                    if (i > 0)
+                    {                    
+                        data[field.name] = field.value;
+                    }                        
+                });
+                $.ajax({
+                    type: "POST",
+                    beforeSend: function () {
+
+                        $("#ajaxLoader").addClass('loader');
+                    },
+                    url: "/Demo/Test",
+                    data: JSON.stringify(data),
+                    contentType: "application/json; charset=utf-8",
+                    datatype: "json",
+                    success: function (data) {
+                       
+                    },
+                    complete: function () {
+                        $("#ajaxLoader").removeClass('loader');
+                    },
+                    error: function () {
+                        alert();
+                    }
+                });              
+            });         
+        });
+    </script>
+</head>
+<body>
+    @using (Html.BeginForm(new {id ="Form1"}))
+    {
+        @Html.AntiForgeryToken()
+        <br />
+        <div class="panel panel-primary">
+            <div class="panel-heading">
+                <h4>New Template</h4>
+            </div>
+            <div class="panel-body">
+                <div class="form-horizontal">
+                    <div class="container-fluid">
+                        <div class="row">
+                            @Html.ValidationSummary(true, "", new { @class = "text-danger" })
+                            <div class="col-md-3">
+                                <div class="col-md-12">
+                                    @Html.Label("Stage Id")
+                                    @Html.DropDownListFor(model => model.StageID, new SelectList(ViewBag.stage, "Key", "Value"), "--Select--", new { @class = "form-control" })
+                                    @Html.ValidationMessageFor(model => model.StageID, "", new { @class = "text-danger" })
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+
+                                <div class="col-md-12">
+                                    @Html.Label("Sequence Id")
+                                    @Html.TextBoxFor(model => model.SEQID, new { @class = "form-control", @placeholder = "Enter Sequance Id" })
+                                    @Html.ValidationMessageFor(model => model.SEQID, "", new { @class = "text-danger" })
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="col-md-12">
+                                    @Html.Label("Route")
+                                    @Html.TextBoxFor(model => model.ROUTE, new { @class = "form-control", @placeholder = "Enter Route" })
+                                    @Html.ValidationMessageFor(model => model.ROUTE, "", new { @class = "text-danger" })
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="col-md-12">
+                                    @Html.Label("Department")
+                                    @Html.TextBoxFor(model => model.DEPARTMENT, new { @class = "form-control", @placeholder = "Enter Department"  })
+                                    @Html.ValidationMessageFor(model => model.DEPARTMENT, "", new { @class = "text-danger" })
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="col-md-12">
+                                    @Html.Label("Dependent")
+                                    @Html.TextBoxFor(model => model.DEPENDENT, new { @class = "form-control", @placeholder = "Enter Department"})
+                                    @Html.ValidationMessageFor(model => model.DEPENDENT, "", new { @class = "text-danger" })
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="col-md-12">
+                                    @Html.Label("Mandatory")
+                                    @Html.DropDownListFor(model => model.MANDATORY, new SelectList(ViewBag.Mandatory, "Key", "Value"), "--Select--", new { @class = "form-control"})
+                                    @Html.ValidationMessageFor(model => model.MANDATORY, "", new { @class = "text-danger" })
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="col-md-12">
+                                    @Html.Label("Mendatory Condition")
+                                    @Html.TextAreaFor(model => model.MANDATORYCOND, new { @class = "form-control", @cols = "80", @placeholder = "Enter Manadatory Condition" })
+                                    @Html.ValidationMessageFor(model => model.MANDATORYCOND, "", new { @class = "text-danger" })
+                                </div>
+                            </div>
+                          
+                        </div>
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="col-md-12">
+                                    @Html.Label("Entry Authority Defined By")
+                                    @Html.TextBoxFor(model => model.ENTRYAUTHORITYBY, new { @class = "form-control", @placeholder = "Enter Authority Defined By" })
+                                    @Html.ValidationMessageFor(model => model.ENTRYAUTHORITYBY, "", new { @class = "text-danger", })
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="col-md-12">
+                                    @Html.Label("Approval Authority Defined BY")
+                                    @Html.TextBoxFor(model => model.APPROVALAUTHORITYBY, new { @class = "form-control", @placeholder = "Enter Approval Authority Defined BY"})
+                                    @Html.ValidationMessageFor(model => model.APPROVALAUTHORITYBY, "", new { @class = "text-danger" })
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="col-md-12">
+                                    @Html.Label("Approval Authority API")
+                                    @Html.TextBoxFor(model => model.APPROVALAUTHORITYAPI, new { @class = "form-control", @placeholder = "Enter Approval Authority API" })
+                                    @Html.ValidationMessageFor(model => model.APPROVALAUTHORITYAPI, "", new { @class = "text-danger" })
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="col-md-12">
+                                    @Html.Label("Status List")
+                                    @Html.DropDownListFor(model => model.STATUSLIST, new SelectList(ViewBag.StatusList, "Key", "Value"), "--Select--", new { @class = "form-control"})
+                                    @Html.ValidationMessageFor(model => model.STATUSLIST, "", new { @class = "text-danger" })
+                                </div>
+                            </div>
+                           
+                        </div>
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="col-md-12">
+                                    @Html.Label("Send Back To")
+                                    @Html.TextBoxFor(model => model.SENDBACKTO, new { @class = "form-control" , @placeholder = "Enter Send Back To" })
+                                    @Html.ValidationMessageFor(model => model.SENDBACKTO, "", new { @class = "text-danger" })
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="col-md-12">
+                                    @Html.Label("Always Move Forward")
+                                    @Html.DropDownListFor(model => model.ALWAYSMOVEFORWARD, new SelectList(ViewBag.AlwyasMove, "Key", "Value"), "--Select--", new { @class = "form-control" })
+                                    @Html.ValidationMessageFor(model => model.ALWAYSMOVEFORWARD, "", new { @class = "text-danger" })
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="col-md-12">
+                                    @Html.Label("File Upload Request")
+                                    @Html.DropDownListFor(model => model.FILEUPLOADREQ, new SelectList(ViewBag.FileUploadReq, "Key", "Value"), "--Select--", new { @class = "form-control" })
+                                    @Html.ValidationMessageFor(model => model.FILEUPLOADREQ, "", new { @class = "text-danger" })
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="col-md-12">
+                                    @Html.Label("Maximum Duration")
+                                    @Html.TextBoxFor(model => model.MAXDURATION, new { @class = "form-control" , @placeholder = "Enter Maximum Duration" })
+                                    @Html.ValidationMessageFor(model => model.MAXDURATION, "", new { @class = "text-danger" })
+                                </div>
+                            </div>                       
+                        </div>
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="col-md-12">
+                                    @Html.Label("Department Head Notify")
+                                    @Html.DropDownListFor(model => model.DEPTHEADNOTIFY, new SelectList(ViewBag.AlwyasMove, "Key", "Value"), "--Select--", new { @class = "form-control" })
+                                    @Html.ValidationMessageFor(model => model.DEPTHEADNOTIFY, "", new { @class = "text-danger" })
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="col-md-12">
+                                    @Html.Label("Department Head Escalation")
+                                    @Html.DropDownListFor(model => model.DEPTHEADESCALATION, new SelectList(ViewBag.Escalation, "Key", "Value"), "--Select--", new { @class = "form-control" })
+                                    @Html.ValidationMessageFor(model => model.DEPTHEADESCALATION, "", new { @class = "text-danger" })
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="col-md-12">
+                                    @Html.Label("Division Head Notify")
+                                    @Html.DropDownListFor(model => model.DIVHEADNOTIFY, new SelectList(ViewBag.AlwyasMove, "Key", "Value"), "--Select--", new { @class = "form-control" })
+                                    @Html.ValidationMessageFor(model => model.DIVHEADNOTIFY, "", new { @class = "text-danger" })
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="col-md-12">
+                                    @Html.Label("Division Head Escalation")
+                                    @Html.DropDownListFor(model => model.DIVHEADESCALATION, new SelectList(ViewBag.Escalation, "Key", "Value"), "--Select--", new { @class = "form-control" })
+                                    @Html.ValidationMessageFor(model => model.DIVHEADESCALATION, "", new { @class = "text-danger" })
+                                </div>
+                            </div>
+                          
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="col-md-12">
+                                    @Html.Label("Dynamic Form Schema")
+                                    @Html.TextAreaFor(model => model.DYNAMICFORMSCHEMA, new { @class = "form-control", @rows = "2", @cols = "50", @placeholder = "Enter Dynamic Schema" })
+                                    @Html.ValidationMessageFor(model => model.DYNAMICFORMSCHEMA, "", new { @class = "text-danger" })
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="col-md-12">
+                                    @Html.Label("Form Url")
+                                    @Html.TextBoxFor(model => model.FORMURL, new { @class = "form-control", @placeholder = "Enter Form Url"} )
+                                    @Html.ValidationMessageFor(model => model.FORMURL, "", new { @class = "text-danger" })
+                                </div>
+                            </div>                 
+                        </div>
+                        <div class="row">
+                            <div class="col-md-12" style="text-align:center">
+                                <br />
+                                <button type="button" class="btn btn-success" id="ADD">Add Template</button>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <br />
+                            <div class="col-md-12" style="text-align:center;overflow-x:auto;">
+                                <div class="tbl" style="margin:4px;overflow-x:auto">
+                                    <table class="table table-bordered table-responsive" style="margin-bottom: 0px!important;" id="myTable">
+                                        <thead>
+                                            <tr class="bg-info">
+                                                <th class="text-center">Stage Id</th>
+                                                <th class="text-center">Sequnace ID</th>
+                                                <th class="text-center">Route</th>
+                                                <th class="text-center">Department</th>
+                                                <th class="text-center">Dependent</th>
+                                                <th class="text-center">Mandatory</th>
+                                                <th class="text-center">Mandatory Condition</th>
+                                                <th class="text-center">Entry Authority Defined By</th>
+                                                <th class="text-center">Approval Authority Defined BY</th>
+                                                <th class="text-center">Approval Authority API</th>
+                                                <th class="text-center">Status List</th>
+                                                <th class="text-center">Send BAck To</th>
+                                                <th class="text-center">Always Move Forward</th>
+                                                <th class="text-center">File Upload Request</th>
+                                                <th class="text-center">Max Duration</th>
+                                                <th class="text-center">Dept Head Notify</th>
+                                                <th class="text-center">Dept Head Escalation</th>
+                                                <th class="text-center">Div Head Notify</th>
+                                                <th class="text-center">Div Head Escalation</th>
+                                                <th class="text-center">Dynamic Form Schema</th>
+                                                <th class="text-center">Form Url</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="append_docRow">
+                                            <tr id="default"><th colspan="6" class="text-center">No record found.</th></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <div>
+        @Html.ActionLink("Back to List", "Index")
+    </div>
+</body>
+</html>

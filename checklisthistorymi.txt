@@ -1,0 +1,140 @@
+ /****** Object:  StoredProcedure [dbo].[sp_GetDailyChecklistData_Test]    Script Date: 6/27/2022 10:34:18 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+--exec sp_GetDailyChecklistData_Test
+ALTER PROCEDURE  [dbo].[sp_GetDailyChecklistData_Test]
+
+AS
+BEGIN
+	
+	With Checklistlatest as 
+	(
+		select fabric_code
+		from ChecklistHistory
+		where cast(createdate as date)=cast(GETDATE() as date)
+	)
+
+	select *,
+			ROW_NUMBER() over (partition by fabric_code order by createdate desc) rowno
+	into #CheckHistory
+	from ChecklistHistory where fabric_code in(select * from Checklistlatest);
+
+	--select * from #CheckHistory;
+	With CheckFirstUpdated as
+	(
+		select * from #CheckHistory where rowno=1
+	),
+	ChecklistDiffStatus as
+	(
+		select a.fabric_code
+		from CheckFirstUpdated a , #CheckHistory b
+		where a.fabric_code=b.fabric_code and b.rowno=2 and a.status<>b.status
+	)
+	select *
+	into #tmpchecklist
+	from #CheckHistory
+	where fabric_code in(select * from ChecklistDiffStatus)
+		and rowno=1 or rowno=2
+
+	--select * from #tmpchecklist order by fabric_code
+	--return
+
+	select *  ,
+		ROW_NUMBER() over (partition by fabric_code order by createdate desc) rownoDraft
+	into #tmpChecklistDraft
+	from ChecklistHistory  where status='Draft' and  fabric_code in(select fabric_code from #tmpchecklist)
+	order by  fabric_code desc --,createdate desc
+
+	select * 
+	into #tmpChecklistDraft1
+	from #tmpChecklistDraft 
+	where rownoDraft=1 -- rowno=1 means this row is last updated
+	
+	select * 
+	into #tmpChecklistDraft2
+	from #tmpChecklistDraft 
+	where rownoDraft=2 
+
+	select a.fabric_code,
+			replace( replace( replace( '<>'+(rtrim(ltrim(replace(replace(( a.FabricContent +'<>'+
+			a.SpecifyFabriccontent +'<>'+
+			a.Weight +'<>'+
+			a.CutWidth +'<>'+
+			a.Stretchability +'<>'+
+			a.Growth +'<>'+
+			a.WarpShrinkage +'<>'+
+			a.WeftShrinkage +'<>'+
+			a.PreTeststatus +'<>'+
+			a.FunctionCallout +'<>'
+			),'><',''),'<>',','))))+'<>' ,',<>',''), '<>,','') ,'<>','') as FieldsUpdated
+	into #tmpUpdatedFields
+	from
+	(select a.fabric_code,
+			(case when a.fabric_content<>b.fabric_content then 'Fabric Content' else '<>' end) as FabricContent,
+			(case when a.specify_fabriccontent<>b.specify_fabriccontent then 'specify fabric content' else '<>' end) as SpecifyFabriccontent,
+			(case when a.weight<>b.weight then 'Weight (oz/yd2) B/W' else '<>' end) as Weight,
+			(case when a.cut_width<>b.cut_width then 'Cut Width (inch)' else '<>' end) as CutWidth,
+			(case when a.stretchability<>b.stretchability then 'Stretchability %' else '<>' end) as Stretchability,
+			(case when a.growth<>b.growth then 'Growth %' else '<>' end) as Growth,
+			(case when a.warp_shrinkage<>b.warp_shrinkage then '(Bulk acceptable range) Warp Shrinkage AATCC / ISO' else '<>' end) as WarpShrinkage,
+			(case when a.weft_shrinkage<>b.weft_shrinkage then '(Bulk acceptable range) Weft Shrinkage AATCC / ISO' else '<>' end) as WeftShrinkage,
+			(case when a.pre_teststatus<>b.pre_teststatus then 'Pre-test status (mapping as Passed/Failed)' else '<>' end) as PreTeststatus,
+			(case when a.function_callout<>b.function_callout then 'Function call-out (base on function test result)' else '<>' end) as FunctionCallout
+	from #tmpChecklistDraft1 a join #tmpChecklistDraft2 b on a.fabric_code=b.fabric_code) a
+
+
+	select 
+		distinct fabric_code,
+		sbu,
+		cast('' as varchar(100)) as Location,
+		cast('' as varchar(100)) as Mill,
+		cast('' as varchar(100)) as previousStatus,
+		status as CurrentStatus,
+		cast('' as varchar(10)) as Version,
+		cast('' as varchar(100)) as SenddateUS,
+		cast('' as varchar(800)) as FiledUpdated
+	into #FinalChecklistData
+	from #tmpchecklist 
+	where rowno=1
+
+	update #FinalChecklistData
+		set Location=f.fabric_location,
+			Mill=f.supplier_code,
+			Version=f.checklist_version,
+			SenddateUS=Convert(varchar(100),f.checklist_sendUS_date,101)
+	from FabricMaster f
+	where f.fabric_code=#FinalChecklistData.fabric_code
+
+	update #FinalChecklistData
+		set previousStatus=status
+	from #tmpchecklist t
+	where rowno=2
+		and t.fabric_code=#FinalChecklistData.fabric_code 
+
+	update #FinalChecklistData
+		set FiledUpdated=t.FieldsUpdated
+	from #tmpUpdatedFields t
+	where  t.fabric_code=#FinalChecklistData.fabric_code 
+
+
+	--select * from #tmpChecklistDraft 
+	
+	--select * from #tmpchecklist
+
+	
+
+	select 
+		sbu,
+		Location,
+		fabric_code,
+		Mill,
+		previousStatus,
+		CurrentStatus,
+		Version,
+		SenddateUS,
+		FiledUpdated
+	from #FinalChecklistData
+
+END

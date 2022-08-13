@@ -1,0 +1,159 @@
+/****** Object:  StoredProcedure [dbo].[sp_GetDailyChecklistData]    Script Date: 6/27/2022 10:33:46 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+--exec sp_GetDailyChecklistData
+ALTER PROCEDURE  [dbo].[sp_GetDailyChecklistData]
+
+AS
+BEGIN
+	
+	CREATE TABLE #cklist(
+		sbu varchar(max),
+		fabric_location varchar(max),
+		fabric_code varchar(max),
+		supplier_code varchar(max),
+		checklist_statusfrom varchar(max),
+		checklist_status varchar(max),
+		checklist_version varchar(max),
+		checklist_sendUS_date varchar(10),
+		fields_update varchar(max),
+		rownum int
+	)
+
+	Declare @UpdatedField varchar(max)
+	 select *,
+       ROW_NUMBER() OVER (
+          PARTITION BY fabric_code
+          order by createdate DESC
+       ) as row_num
+	into #temp_cte
+    from ChecklistHistory 
+
+	--second-last record
+	select * 
+		into #second_last
+	from #temp_cte
+		where row_num =2 
+	--------------------------------
+	--last-update record	
+	select * 
+		into #last_update	
+	from #temp_cte
+		where row_num =1
+	----------------------------------------
+
+	--get the detail of today added record
+
+	select
+		c.sbu,
+		f.fabric_location,
+		f.fabric_code,
+		f.supplier_code,
+		'' as checklist_statusfrom,
+		f.checklist_status,
+		f.checklist_version,
+		Convert(varchar(10),f.checklist_sendUS_date,101) as checklist_sendUS_date,
+		'' as fields_update ,
+		ROW_NUMBER() OVER (
+          PARTITION BY f.fabric_code
+          order by c.createdate DESC
+       ) as row_num
+	into #reschecklist
+	from ChecklistHistory as c,FabricMaster as f 
+	where 
+		c.fabric_code =f.fabric_code and
+	--	Convert(varchar(10),f.create_date,105)=Convert(varchar(10),getdate(),105) 
+		Convert(varchar(10),c.createdate,105)=Convert(varchar(10),getdate(),105) 	
+		
+
+	insert into #cklist(
+		sbu,
+		fabric_location,
+		fabric_code,
+		supplier_code,
+		checklist_statusfrom,
+		checklist_status,
+		checklist_version,
+		checklist_sendUS_date,
+		fields_update ,
+		rownum)
+	select
+		sbu,
+		fabric_location,
+		fabric_code,
+		supplier_code,
+		checklist_statusfrom,
+		checklist_status,
+		checklist_version,
+		Convert(varchar(10),checklist_sendUS_date,105),
+		'' as fields_update,
+		row_num
+	from #reschecklist 
+	where 
+		row_num=1	 
+	--------------------------------------------------------------------------------
+
+	--Compare last and second last record 
+	select * into #tmp from (	
+		select 'Fabric Content' as diff ,l.fabric_code from #second_last as s join #last_update as l on s.fabric_code=l.fabric_code where isnull(s.fabric_content,'')<>isnull(l.fabric_content,'') 
+		union
+		select 'Specify fabric content' as diff ,l.fabric_code from #second_last as s join #last_update as l on s.fabric_code=l.fabric_code where isnull(s.specify_fabriccontent,'')<>isnull(l.specify_fabriccontent,'') 
+		union
+		select 'Weight (oz/yd2) B/W' as diff,l.fabric_code from #second_last as s join #last_update as l on s.fabric_code=l.fabric_code where isnull(s.weight,'')<>isnull(l.weight,'')
+		union
+		select 'Cut Width (inch)' as diff,l.fabric_code from #second_last as s join #last_update as l on s.fabric_code=l.fabric_code where isnull(s.cut_width,'')<>isnull(l.cut_width,'')
+		union
+		select 'Stretchability %' as diff,l.fabric_code  from #second_last as s join #last_update as l on s.fabric_code=l.fabric_code where isnull(s.stretchability,'')<>isnull(l.stretchability,'')
+		union
+		select 'Growth %' as diff,l.fabric_code  from #second_last as s join #last_update as l on s.fabric_code=l.fabric_code where isnull(s.growth,'')<>isnull(l.growth,'')
+		union
+		select '(Bulk acceptable range) Warp Shrinkage AATCC / ISO' as diff,l.fabric_code  from #second_last as s join #last_update as l on s.fabric_code=l.fabric_code where isnull(s.warp_shrinkage,'')<>isnull(l.warp_shrinkage,'')
+		union
+		select '(Bulk acceptable range) Weft Shrinkage AATCC / ISO' as diff,l.fabric_code  from #second_last as s join #last_update as l on s.fabric_code=l.fabric_code where isnull(s.weft_shrinkage,'')<>isnull(l.weft_shrinkage,'')
+		union
+		select 'Function call-out (base on function test result)' as diff,l.fabric_code  from #second_last as s join #last_update as l on s.fabric_code=l.fabric_code where isnull(s.function_callout,'')<>isnull(l.function_callout,'')
+		union
+		select 'Pre-test status (mapping as Passed/Failed)' as diff,l.fabric_code  from #second_last as s join #last_update as l on s.fabric_code=l.fabric_code where isnull(s.pre_teststatus,'')<>isnull(l.pre_teststatus,'')
+	)a
+	--------------------------------------------------------------------------------------------------------------------------------------
+	----set diffrence into a single column
+	select diff as Diff_result,fabric_code  into #Dfftmp
+	from(
+		SELECT fabric_code, diff = 
+			STUFF((SELECT DISTINCT ', ' + diff
+				   FROM #tmp b 
+				   WHERE b.fabric_code = a.fabric_code 
+				   FOR XML PATH('')), 1, 2, '')
+		FROM #tmp a
+	GROUP BY fabric_code
+	)c
+
+	--select * into #Dfftmp
+	--from(
+	--SELECT STRING_AGG(diff, ',') AS Diff_result ,fabric_code FROM #tmp group by fabric_code)b
+	----------------------------------------------------------------------------------------------------------------
+
+	--update status and changed columnname 
+	update #cklist	
+		set checklist_statusfrom=l.status
+	from #second_last as l where l.fabric_code=#cklist.fabric_code --and #cklist.rownum = 1 
+
+	update #cklist
+		set fields_update=d.Diff_result
+	from #Dfftmp as d where d.fabric_code=#cklist.fabric_code --and #cklist.rownum = 1 
+
+	select 
+		sbu,
+		fabric_location,
+		fabric_code,
+		supplier_code,
+		checklist_statusfrom,
+		checklist_status,
+		checklist_version,
+		checklist_sendUS_date,
+		fields_update  
+	from #cklist --where rownum = 1 
+	
+END
